@@ -1,34 +1,633 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/electron-vite.animate.svg'
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react'
 import './App.css'
+import { createId, loadData, saveData } from './storage'
+import type {
+  AppEntry,
+  AppEntryType,
+  DevDeskData,
+  LearningLog,
+  Priority,
+  Project,
+  ProjectStatus,
+  Task,
+  TaskStatus,
+} from './types'
+
+type PageId = 'dashboard' | 'projects' | 'logs' | 'tasks' | 'apps' | 'settings'
+
+const pages: Array<{ id: PageId; label: string }> = [
+  { id: 'dashboard', label: '首页' },
+  { id: 'projects', label: '项目' },
+  { id: 'logs', label: '日志' },
+  { id: 'tasks', label: '任务' },
+  { id: 'apps', label: '应用' },
+  { id: 'settings', label: '设置' },
+]
+
+const projectStatuses: ProjectStatus[] = ['想法中', '开发中', '暂停', '完成']
+const taskStatuses: TaskStatus[] = ['待做', '进行中', '完成']
+const priorities: Priority[] = ['低', '中', '高']
+const appTypes: AppEntryType[] = ['网页链接', '本地路径', '内置页面']
+
+function getToday(): string {
+  return new Date().toISOString().slice(0, 10)
+}
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [page, setPage] = useState<PageId>('dashboard')
+  const [data, setData] = useState<DevDeskData>(() => loadData())
+
+  useEffect(() => {
+    saveData(data)
+  }, [data])
+
+  const projectNameById = useMemo(
+    () => new Map(data.projects.map((project) => [project.id, project.name])),
+    [data.projects],
+  )
 
   return (
-    <>
-      <div>
-        <a href="https://electron-vite.github.io" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <main className="app-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark">D</div>
+          <div>
+            <strong>DevDesk</strong>
+            <span>个人开发学习工作台</span>
+          </div>
+        </div>
+
+        <nav className="nav-list">
+          {pages.map((item) => (
+            <button
+              className={page === item.id ? 'active' : ''}
+              key={item.id}
+              type="button"
+              onClick={() => setPage(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      </aside>
+
+      <section className="workspace">
+        {page === 'dashboard' && <Dashboard data={data} projectNameById={projectNameById} />}
+        {page === 'projects' && <ProjectsPage data={data} setData={setData} />}
+        {page === 'logs' && <LogsPage data={data} setData={setData} projectNameById={projectNameById} />}
+        {page === 'tasks' && <TasksPage data={data} setData={setData} projectNameById={projectNameById} />}
+        {page === 'apps' && <AppsPage data={data} setData={setData} />}
+        {page === 'settings' && <SettingsPage />}
+      </section>
+    </main>
+  )
+}
+
+function Dashboard({
+  data,
+  projectNameById,
+}: {
+  data: DevDeskData
+  projectNameById: Map<string, string>
+}) {
+  const activeTasks = data.tasks.filter((task) => task.status !== '完成')
+  const doneTasks = data.tasks.filter((task) => task.status === '完成')
+
+  return (
+    <Page title="首页" subtitle="快速查看你的项目、任务和学习记录">
+      <div className="stats-grid">
+        <Stat label="项目" value={data.projects.length} />
+        <Stat label="任务" value={data.tasks.length} />
+        <Stat label="已完成" value={doneTasks.length} />
+        <Stat label="日志" value={data.logs.length} />
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
+
+      <div className="panel-grid">
+        <Panel title="最近项目">
+          {data.projects.slice(0, 4).map((project) => (
+            <InfoRow
+              key={project.id}
+              title={project.name}
+              meta={`${project.status} · ${project.nextStep || '暂无下一步'}`}
+            />
+          ))}
+        </Panel>
+        <Panel title="当前任务">
+          {activeTasks.slice(0, 5).map((task) => (
+            <InfoRow
+              key={task.id}
+              title={task.title}
+              meta={`${task.status} · ${task.priority} · ${projectNameById.get(task.projectId) || '未关联项目'}`}
+            />
+          ))}
+        </Panel>
+        <Panel title="最近日志">
+          {data.logs.slice(0, 4).map((log) => (
+            <InfoRow key={log.id} title={log.date} meta={log.learned || '暂无内容'} />
+          ))}
+        </Panel>
+      </div>
+    </Page>
+  )
+}
+
+function ProjectsPage({
+  data,
+  setData,
+}: {
+  data: DevDeskData
+  setData: (data: DevDeskData) => void
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    name: '',
+    status: '想法中' as ProjectStatus,
+    techStack: '',
+    currentGoal: '',
+    nextStep: '',
+    localPath: '',
+    repoUrl: '',
+  })
+
+  function resetForm(): void {
+    setEditingId(null)
+    setForm({
+      name: '',
+      status: '想法中',
+      techStack: '',
+      currentGoal: '',
+      nextStep: '',
+      localPath: '',
+      repoUrl: '',
+    })
+  }
+
+  function submit(event: FormEvent): void {
+    event.preventDefault()
+    if (!form.name.trim()) return
+
+    const nextProject: Project = {
+      id: editingId ?? createId('project'),
+      ...form,
+      updatedAt: new Date().toISOString(),
+    }
+
+    setData({
+      ...data,
+      projects: editingId
+        ? data.projects.map((project) => (project.id === editingId ? nextProject : project))
+        : [nextProject, ...data.projects],
+    })
+    resetForm()
+  }
+
+  return (
+    <Page title="项目" subtitle="管理正在做、准备做、已经完成的学习项目">
+      <form className="editor" onSubmit={submit}>
+        <Field label="项目名称" value={form.name} onChange={(name) => setForm({ ...form, name })} />
+        <SelectField
+          label="状态"
+          value={form.status}
+          options={projectStatuses}
+          onChange={(status) => setForm({ ...form, status: status as ProjectStatus })}
+        />
+        <Field label="技术栈" value={form.techStack} onChange={(techStack) => setForm({ ...form, techStack })} />
+        <Field label="本地路径" value={form.localPath} onChange={(localPath) => setForm({ ...form, localPath })} />
+        <Field label="仓库地址" value={form.repoUrl} onChange={(repoUrl) => setForm({ ...form, repoUrl })} />
+        <TextField
+          label="当前目标"
+          value={form.currentGoal}
+          onChange={(currentGoal) => setForm({ ...form, currentGoal })}
+        />
+        <TextField label="下一步" value={form.nextStep} onChange={(nextStep) => setForm({ ...form, nextStep })} />
+        <FormActions submitLabel={editingId ? '保存项目' : '新建项目'} onCancel={resetForm} />
+      </form>
+
+      <div className="card-list">
+        {data.projects.map((project) => (
+          <article className="item-card" key={project.id}>
+            <div>
+              <span className="badge">{project.status}</span>
+              <h3>{project.name}</h3>
+              <p>{project.currentGoal || '暂无当前目标'}</p>
+              <small>{project.techStack || '未填写技术栈'}</small>
+            </div>
+            <div className="row-actions">
+              {project.localPath && (
+                <button type="button" onClick={() => window.devdesk.system.openTarget(project.localPath)}>
+                  打开
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingId(project.id)
+                  setForm({
+                    name: project.name,
+                    status: project.status,
+                    techStack: project.techStack,
+                    currentGoal: project.currentGoal,
+                    nextStep: project.nextStep,
+                    localPath: project.localPath,
+                    repoUrl: project.repoUrl,
+                  })
+                }}
+              >
+                编辑
+              </button>
+              <button
+                className="danger"
+                type="button"
+                onClick={() =>
+                  setData({
+                    ...data,
+                    projects: data.projects.filter((item) => item.id !== project.id),
+                  })
+                }
+              >
+                删除
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </Page>
+  )
+}
+
+function LogsPage({
+  data,
+  setData,
+  projectNameById,
+}: {
+  data: DevDeskData
+  setData: (data: DevDeskData) => void
+  projectNameById: Map<string, string>
+}) {
+  const [form, setForm] = useState({
+    date: getToday(),
+    projectId: '',
+    learned: '',
+    problems: '',
+    solutions: '',
+    nextPlan: '',
+  })
+
+  function submit(event: FormEvent): void {
+    event.preventDefault()
+    const log: LearningLog = { id: createId('log'), ...form }
+    setData({ ...data, logs: [log, ...data.logs] })
+    setForm({ date: getToday(), projectId: '', learned: '', problems: '', solutions: '', nextPlan: '' })
+  }
+
+  return (
+    <Page title="学习日志" subtitle="把每天学到的东西和问题沉淀下来">
+      <form className="editor" onSubmit={submit}>
+        <Field label="日期" type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} />
+        <ProjectSelect projects={data.projects} value={form.projectId} onChange={(projectId) => setForm({ ...form, projectId })} />
+        <TextField label="今天学了什么" value={form.learned} onChange={(learned) => setForm({ ...form, learned })} />
+        <TextField label="遇到的问题" value={form.problems} onChange={(problems) => setForm({ ...form, problems })} />
+        <TextField label="解决方案" value={form.solutions} onChange={(solutions) => setForm({ ...form, solutions })} />
+        <TextField label="明天继续" value={form.nextPlan} onChange={(nextPlan) => setForm({ ...form, nextPlan })} />
+        <FormActions submitLabel="新建日志" />
+      </form>
+
+      <div className="card-list">
+        {data.logs.map((log) => (
+          <article className="item-card" key={log.id}>
+            <div>
+              <span className="badge">{log.date}</span>
+              <h3>{projectNameById.get(log.projectId) || '未关联项目'}</h3>
+              <p>{log.learned || '暂无学习内容'}</p>
+              <small>{log.nextPlan || '未填写明天计划'}</small>
+            </div>
+            <div className="row-actions">
+              <button
+                className="danger"
+                type="button"
+                onClick={() =>
+                  setData({
+                    ...data,
+                    logs: data.logs.filter((item) => item.id !== log.id),
+                  })
+                }
+              >
+                删除
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </Page>
+  )
+}
+
+function TasksPage({
+  data,
+  setData,
+  projectNameById,
+}: {
+  data: DevDeskData
+  setData: (data: DevDeskData) => void
+  projectNameById: Map<string, string>
+}) {
+  const [form, setForm] = useState({
+    projectId: '',
+    title: '',
+    status: '待做' as TaskStatus,
+    priority: '中' as Priority,
+    dueDate: '',
+    notes: '',
+  })
+
+  function submit(event: FormEvent): void {
+    event.preventDefault()
+    if (!form.title.trim()) return
+    const task: Task = { id: createId('task'), ...form }
+    setData({ ...data, tasks: [task, ...data.tasks] })
+    setForm({ projectId: '', title: '', status: '待做', priority: '中', dueDate: '', notes: '' })
+  }
+
+  return (
+    <Page title="任务" subtitle="拆解下一步要做的具体动作">
+      <form className="editor" onSubmit={submit}>
+        <Field label="任务标题" value={form.title} onChange={(title) => setForm({ ...form, title })} />
+        <ProjectSelect projects={data.projects} value={form.projectId} onChange={(projectId) => setForm({ ...form, projectId })} />
+        <SelectField
+          label="状态"
+          value={form.status}
+          options={taskStatuses}
+          onChange={(status) => setForm({ ...form, status: status as TaskStatus })}
+        />
+        <SelectField
+          label="优先级"
+          value={form.priority}
+          options={priorities}
+          onChange={(priority) => setForm({ ...form, priority: priority as Priority })}
+        />
+        <Field label="截止日期" type="date" value={form.dueDate} onChange={(dueDate) => setForm({ ...form, dueDate })} />
+        <TextField label="备注" value={form.notes} onChange={(notes) => setForm({ ...form, notes })} />
+        <FormActions submitLabel="新建任务" />
+      </form>
+
+      <div className="task-columns">
+        {taskStatuses.map((status) => (
+          <section className="task-column" key={status}>
+            <h2>{status}</h2>
+            {data.tasks
+              .filter((task) => task.status === status)
+              .map((task) => (
+                <article className="task-card" key={task.id}>
+                  <span className="badge">{task.priority}</span>
+                  <h3>{task.title}</h3>
+                  <p>{projectNameById.get(task.projectId) || '未关联项目'}</p>
+                  <small>{task.dueDate || '无截止日期'}</small>
+                  <div className="row-actions">
+                    {taskStatuses.map((nextStatus) => (
+                      <button
+                        key={nextStatus}
+                        type="button"
+                        onClick={() =>
+                          setData({
+                            ...data,
+                            tasks: data.tasks.map((item) =>
+                              item.id === task.id ? { ...item, status: nextStatus } : item,
+                            ),
+                          })
+                        }
+                      >
+                        {nextStatus}
+                      </button>
+                    ))}
+                    <button
+                      className="danger"
+                      type="button"
+                      onClick={() => setData({ ...data, tasks: data.tasks.filter((item) => item.id !== task.id) })}
+                    >
+                      删除
+                    </button>
+                  </div>
+                </article>
+              ))}
+          </section>
+        ))}
+      </div>
+    </Page>
+  )
+}
+
+function AppsPage({
+  data,
+  setData,
+}: {
+  data: DevDeskData
+  setData: (data: DevDeskData) => void
+}) {
+  const [form, setForm] = useState({
+    name: '',
+    type: '网页链接' as AppEntryType,
+    description: '',
+    target: '',
+  })
+
+  function submit(event: FormEvent): void {
+    event.preventDefault()
+    if (!form.name.trim()) return
+    const entry: AppEntry = { id: createId('app'), ...form }
+    setData({ ...data, apps: [entry, ...data.apps] })
+    setForm({ name: '', type: '网页链接', description: '', target: '' })
+  }
+
+  return (
+    <Page title="应用入口" subtitle="登记后续制作的小工具、网页和本地项目">
+      <form className="editor" onSubmit={submit}>
+        <Field label="应用名称" value={form.name} onChange={(name) => setForm({ ...form, name })} />
+        <SelectField
+          label="类型"
+          value={form.type}
+          options={appTypes}
+          onChange={(type) => setForm({ ...form, type: type as AppEntryType })}
+        />
+        <Field label="地址或路径" value={form.target} onChange={(target) => setForm({ ...form, target })} />
+        <TextField label="描述" value={form.description} onChange={(description) => setForm({ ...form, description })} />
+        <FormActions submitLabel="新建入口" />
+      </form>
+
+      <div className="card-list">
+        {data.apps.map((entry) => (
+          <article className="item-card" key={entry.id}>
+            <div>
+              <span className="badge">{entry.type}</span>
+              <h3>{entry.name}</h3>
+              <p>{entry.description || '暂无描述'}</p>
+              <small>{entry.target || '暂无地址或路径'}</small>
+            </div>
+            <div className="row-actions">
+              {entry.target && (
+                <button type="button" onClick={() => window.devdesk.system.openTarget(entry.target)}>
+                  打开
+                </button>
+              )}
+              <button
+                className="danger"
+                type="button"
+                onClick={() =>
+                  setData({
+                    ...data,
+                    apps: data.apps.filter((item) => item.id !== entry.id),
+                  })
+                }
+              >
+                删除
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </Page>
+  )
+}
+
+function SettingsPage() {
+  return (
+    <Page title="设置" subtitle="第一版先保留简单设置入口">
+      <div className="panel-grid">
+        <Panel title="数据存储">当前数据暂存在浏览器本地存储，后续可迁移到 SQLite。</Panel>
+        <Panel title="主题">当前使用浅色工作台风格，深色模式后续再加。</Panel>
+        <Panel title="备份">导入、导出和备份功能留到数据模型稳定后实现。</Panel>
+      </div>
+    </Page>
+  )
+}
+
+function Page({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
+  return (
+    <div className="page">
+      <header className="page-header">
+        <h1>{title}</h1>
+        <p>{subtitle}</p>
+      </header>
+      {children}
+    </div>
+  )
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="stat-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
+function Panel({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="panel">
+      <h2>{title}</h2>
+      <div className="panel-body">{children}</div>
+    </section>
+  )
+}
+
+function InfoRow({ title, meta }: { title: string; meta: string }) {
+  return (
+    <div className="info-row">
+      <strong>{title}</strong>
+      <span>{meta}</span>
+    </div>
+  )
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  type = 'text',
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  type?: string
+}) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  )
+}
+
+function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <textarea value={value} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  )
+}
+
+function SelectField({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+function ProjectSelect({
+  projects,
+  value,
+  onChange,
+}: {
+  projects: Project[]
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="field">
+      <span>关联项目</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">未关联项目</option>
+        {projects.map((project) => (
+          <option key={project.id} value={project.id}>
+            {project.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+function FormActions({ submitLabel, onCancel }: { submitLabel: string; onCancel?: () => void }) {
+  return (
+    <div className="form-actions">
+      <button className="primary-button" type="submit">
+        {submitLabel}
+      </button>
+      {onCancel && (
+        <button type="button" onClick={onCancel}>
+          清空
         </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+      )}
+    </div>
   )
 }
 
