@@ -103,15 +103,17 @@ export function useWorkspaceData() {
         logs: currentData.logs.filter((log) => log.id !== logId),
       }));
     },
-    addTask(taskForm: TaskForm) {
+    saveTask(taskForm: TaskForm, editingId?: string | null) {
       const task: Task = {
-        id: createId("task"),
+        id: editingId ?? createId("task"),
         ...taskForm,
       };
 
       setData((currentData) => ({
         ...currentData,
-        tasks: [task, ...currentData.tasks],
+        tasks: editingId
+          ? currentData.tasks.map((item) => (item.id === editingId ? task : item))
+          : [task, ...currentData.tasks],
       }));
     },
     updateTaskStatus(taskId: string, status: TaskStatus) {

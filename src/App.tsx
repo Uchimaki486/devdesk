@@ -305,6 +305,7 @@ function TasksPage({
   projectNameById: Map<string, string>
 }) {
   const { data } = workspace
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
     projectId: '',
     title: '',
@@ -314,11 +315,16 @@ function TasksPage({
     notes: '',
   })
 
+  function resetForm(): void {
+    setEditingId(null)
+    setForm({ projectId: '', title: '', status: '待做', priority: '中', dueDate: '', notes: '' })
+  }
+
   function submit(event: FormEvent): void {
     event.preventDefault()
     if (!form.title.trim()) return
-    workspace.addTask(form)
-    setForm({ projectId: '', title: '', status: '待做', priority: '中', dueDate: '', notes: '' })
+    workspace.saveTask(form, editingId)
+    resetForm()
   }
 
   return (
@@ -340,7 +346,7 @@ function TasksPage({
         />
         <Field label="截止日期" type="date" value={form.dueDate} onChange={(dueDate) => setForm({ ...form, dueDate })} />
         <TextField label="备注" value={form.notes} onChange={(notes) => setForm({ ...form, notes })} />
-        <FormActions submitLabel="新建任务" />
+        <FormActions submitLabel={editingId ? '保存任务' : '新建任务'} onCancel={resetForm} />
       </form>
 
       <div className="task-columns">
@@ -367,6 +373,22 @@ function TasksPage({
                         {nextStatus}
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(task.id)
+                        setForm({
+                          projectId: task.projectId,
+                          title: task.title,
+                          status: task.status,
+                          priority: task.priority,
+                          dueDate: task.dueDate,
+                          notes: task.notes,
+                        })
+                      }}
+                    >
+                      编辑
+                    </button>
                     <button
                       className="danger"
                       type="button"
