@@ -1,19 +1,17 @@
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react'
+import { FormEvent, ReactNode, useMemo, useState } from 'react'
 import './App.css'
-import { createId, loadData, saveData } from './storage'
+import { useWorkspaceData } from './useWorkspaceData'
 import type {
-  AppEntry,
   AppEntryType,
   DevDeskData,
-  LearningLog,
   Priority,
   Project,
   ProjectStatus,
-  Task,
   TaskStatus,
 } from './types'
 
 type PageId = 'dashboard' | 'projects' | 'logs' | 'tasks' | 'apps' | 'settings'
+type WorkspaceActions = ReturnType<typeof useWorkspaceData>
 
 const pages: Array<{ id: PageId; label: string }> = [
   { id: 'dashboard', label: '首页' },
@@ -35,11 +33,8 @@ function getToday(): string {
 
 function App() {
   const [page, setPage] = useState<PageId>('dashboard')
-  const [data, setData] = useState<DevDeskData>(() => loadData())
-
-  useEffect(() => {
-    saveData(data)
-  }, [data])
+  const workspace = useWorkspaceData()
+  const { data } = workspace
 
   const projectNameById = useMemo(
     () => new Map(data.projects.map((project) => [project.id, project.name])),
@@ -73,10 +68,10 @@ function App() {
 
       <section className="workspace">
         {page === 'dashboard' && <Dashboard data={data} projectNameById={projectNameById} />}
-        {page === 'projects' && <ProjectsPage data={data} setData={setData} />}
-        {page === 'logs' && <LogsPage data={data} setData={setData} projectNameById={projectNameById} />}
-        {page === 'tasks' && <TasksPage data={data} setData={setData} projectNameById={projectNameById} />}
-        {page === 'apps' && <AppsPage data={data} setData={setData} />}
+        {page === 'projects' && <ProjectsPage workspace={workspace} />}
+        {page === 'logs' && <LogsPage workspace={workspace} projectNameById={projectNameById} />}
+        {page === 'tasks' && <TasksPage workspace={workspace} projectNameById={projectNameById} />}
+        {page === 'apps' && <AppsPage workspace={workspace} />}
         {page === 'settings' && <SettingsPage />}
       </section>
     </main>
@@ -132,12 +127,11 @@ function Dashboard({
 }
 
 function ProjectsPage({
-  data,
-  setData,
+  workspace,
 }: {
-  data: DevDeskData
-  setData: (data: DevDeskData) => void
+  workspace: WorkspaceActions
 }) {
+  const { data } = workspace
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
     name: '',
@@ -166,18 +160,7 @@ function ProjectsPage({
     event.preventDefault()
     if (!form.name.trim()) return
 
-    const nextProject: Project = {
-      id: editingId ?? createId('project'),
-      ...form,
-      updatedAt: new Date().toISOString(),
-    }
-
-    setData({
-      ...data,
-      projects: editingId
-        ? data.projects.map((project) => (project.id === editingId ? nextProject : project))
-        : [nextProject, ...data.projects],
-    })
+    workspace.saveProject(form, editingId)
     resetForm()
   }
 
@@ -239,10 +222,7 @@ function ProjectsPage({
                 className="danger"
                 type="button"
                 onClick={() =>
-                  setData({
-                    ...data,
-                    projects: data.projects.filter((item) => item.id !== project.id),
-                  })
+                  workspace.deleteProject(project.id)
                 }
               >
                 删除
@@ -256,14 +236,13 @@ function ProjectsPage({
 }
 
 function LogsPage({
-  data,
-  setData,
+  workspace,
   projectNameById,
 }: {
-  data: DevDeskData
-  setData: (data: DevDeskData) => void
+  workspace: WorkspaceActions
   projectNameById: Map<string, string>
 }) {
+  const { data } = workspace
   const [form, setForm] = useState({
     date: getToday(),
     projectId: '',
@@ -275,8 +254,7 @@ function LogsPage({
 
   function submit(event: FormEvent): void {
     event.preventDefault()
-    const log: LearningLog = { id: createId('log'), ...form }
-    setData({ ...data, logs: [log, ...data.logs] })
+    workspace.addLog(form)
     setForm({ date: getToday(), projectId: '', learned: '', problems: '', solutions: '', nextPlan: '' })
   }
 
@@ -306,10 +284,7 @@ function LogsPage({
                 className="danger"
                 type="button"
                 onClick={() =>
-                  setData({
-                    ...data,
-                    logs: data.logs.filter((item) => item.id !== log.id),
-                  })
+                  workspace.deleteLog(log.id)
                 }
               >
                 删除
@@ -323,14 +298,13 @@ function LogsPage({
 }
 
 function TasksPage({
-  data,
-  setData,
+  workspace,
   projectNameById,
 }: {
-  data: DevDeskData
-  setData: (data: DevDeskData) => void
+  workspace: WorkspaceActions
   projectNameById: Map<string, string>
 }) {
+  const { data } = workspace
   const [form, setForm] = useState({
     projectId: '',
     title: '',
@@ -343,8 +317,7 @@ function TasksPage({
   function submit(event: FormEvent): void {
     event.preventDefault()
     if (!form.title.trim()) return
-    const task: Task = { id: createId('task'), ...form }
-    setData({ ...data, tasks: [task, ...data.tasks] })
+    workspace.addTask(form)
     setForm({ projectId: '', title: '', status: '待做', priority: '中', dueDate: '', notes: '' })
   }
 
@@ -388,12 +361,7 @@ function TasksPage({
                         key={nextStatus}
                         type="button"
                         onClick={() =>
-                          setData({
-                            ...data,
-                            tasks: data.tasks.map((item) =>
-                              item.id === task.id ? { ...item, status: nextStatus } : item,
-                            ),
-                          })
+                          workspace.updateTaskStatus(task.id, nextStatus)
                         }
                       >
                         {nextStatus}
@@ -402,7 +370,7 @@ function TasksPage({
                     <button
                       className="danger"
                       type="button"
-                      onClick={() => setData({ ...data, tasks: data.tasks.filter((item) => item.id !== task.id) })}
+                      onClick={() => workspace.deleteTask(task.id)}
                     >
                       删除
                     </button>
@@ -417,12 +385,11 @@ function TasksPage({
 }
 
 function AppsPage({
-  data,
-  setData,
+  workspace,
 }: {
-  data: DevDeskData
-  setData: (data: DevDeskData) => void
+  workspace: WorkspaceActions
 }) {
+  const { data } = workspace
   const [form, setForm] = useState({
     name: '',
     type: '网页链接' as AppEntryType,
@@ -433,8 +400,7 @@ function AppsPage({
   function submit(event: FormEvent): void {
     event.preventDefault()
     if (!form.name.trim()) return
-    const entry: AppEntry = { id: createId('app'), ...form }
-    setData({ ...data, apps: [entry, ...data.apps] })
+    workspace.addApp(form)
     setForm({ name: '', type: '网页链接', description: '', target: '' })
   }
 
@@ -472,10 +438,7 @@ function AppsPage({
                 className="danger"
                 type="button"
                 onClick={() =>
-                  setData({
-                    ...data,
-                    apps: data.apps.filter((item) => item.id !== entry.id),
-                  })
+                  workspace.deleteApp(entry.id)
                 }
               >
                 删除
