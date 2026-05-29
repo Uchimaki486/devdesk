@@ -1,48 +1,16 @@
-# DevDesk Git 管理规范
+# DevDesk Git 使用规范
 
 ## 1. 基本原则
 
-- 每完成一个清晰阶段就提交一次。
-- 不把多个无关修改混在同一次提交里。
-- 提交前先确认应用能正常启动或至少通过基础检查。
-- 不提交系统环境、缓存、构建产物和本机私有配置。
+- `main` 保持稳定。
+- 每个功能使用独立分支。
+- 每完成一个明确功能点提交一次。
+- 提交前查看 diff，避免混入无关修改。
+- 优先通过 GitHub Pull Request 合并功能分支。
 
-## 2. 推荐提交时机
+## 2. 提交信息
 
-适合提交：
-
-- 初始化脚手架完成
-- 新增一个页面或一个完整功能
-- 修复一个明确问题
-- 调整项目配置
-- 更新文档
-
-不建议提交：
-
-- 功能写到一半且无法运行
-- 临时调试代码
-- 大量无关格式化改动混在功能改动中
-
-## 3. 提交前检查
-
-提交前建议执行：
-
-```powershell
-git status
-pnpm.cmd lint
-```
-
-如果只是文档修改，可以不跑 lint。
-
-如果改了 TypeScript 逻辑，建议再执行：
-
-```powershell
-.\node_modules\.bin\tsc.CMD --noEmit
-```
-
-## 4. 提交信息格式
-
-使用简洁英文提交信息：
+格式：
 
 ```text
 type: short description
@@ -50,59 +18,114 @@ type: short description
 
 常用 type：
 
-- `chore`：脚手架、依赖、配置、杂项
 - `feat`：新功能
 - `fix`：修复问题
+- `refactor`：重构
 - `docs`：文档
 - `style`：样式调整
-- `refactor`：重构
+- `chore`：配置、依赖、脚手架、杂项
 - `test`：测试
 
 示例：
 
 ```powershell
-git commit -m "chore: scaffold electron react app"
-git commit -m "feat: add devdesk mvp workspace"
-git commit -m "fix: keep task status after reload"
-git commit -m "docs: add git guide"
+git commit -m "feat: add learning log editing"
+git commit -m "refactor: extract workspace data actions"
+git commit -m "docs: update project overview"
 ```
 
-## 5. 分支建议
+## 3. 分支命名
 
-个人学习阶段可以先只用：
+建议格式：
 
 ```text
-main
+feat/log-editing
+fix/window-startup
+refactor/storage-layer
+docs/project-overview
 ```
 
-后续功能变复杂后，再使用功能分支：
+## 4. 推荐流程：GitHub PR 合并
+
+开始功能：
 
 ```powershell
-git checkout -b feat/sqlite-storage
-git checkout -b feat/app-launcher
-git checkout -b fix/window-startup
+git checkout main
+git pull --ff-only origin main
+git checkout -b feat/small-feature
 ```
 
-功能完成后合回 `main`。
+开发后提交：
 
-## 6. 应该提交的文件
+```powershell
+git status
+git diff
+git add .
+git commit -m "feat: add small feature"
+```
 
-应该提交：
+推送分支：
 
-- `src/`
-- `electron/`
-- `public/`
-- `package.json`
-- `pnpm-lock.yaml`
-- `pnpm-workspace.yaml`
-- `tsconfig*.json`
-- `vite.config.ts`
-- `.gitignore`
-- `.gitattributes`
-- `.editorconfig`
-- 项目文档
+```powershell
+git push -u origin feat/small-feature
+```
 
-不应该提交：
+GitHub 上操作：
+
+1. 创建 Pull Request
+2. 确认 `base: main`，`compare: feat/small-feature`
+3. 查看 `Files changed`
+4. Merge Pull Request
+5. 删除远程功能分支
+
+合并后同步本地：
+
+```powershell
+git checkout main
+git pull --ff-only origin main
+git branch -d feat/small-feature
+```
+
+## 5. 本地合并
+
+小改动也可以本地合并：
+
+```powershell
+git checkout main
+git pull --ff-only origin main
+git merge --no-ff feat/small-feature
+git push origin main
+git branch -d feat/small-feature
+```
+
+说明：
+
+- `--no-ff` 会保留一次明确的 merge commit。
+- 如果想保持线性历史，可以使用 `git merge feat/small-feature`。
+
+## 6. `git pull --ff-only origin main`
+
+含义：
+
+> 从远程 `origin/main` 拉取更新，但只允许快进，不允许自动生成 merge commit。
+
+适合用于同步 `main`：
+
+```powershell
+git checkout main
+git pull --ff-only origin main
+```
+
+如果失败，说明本地和远程历史分叉了。此时不要反复 `git pull`，先检查：
+
+```powershell
+git status --short --branch
+git log --oneline --graph --decorate --all -n 20
+```
+
+## 7. 不提交的文件
+
+不提交构建产物和依赖目录：
 
 - `node_modules/`
 - `dist/`
@@ -112,74 +135,29 @@ git checkout -b fix/window-startup
 - 本机缓存
 - 私人密钥或 token
 
-## 7. 换行符规范
+应该提交：
 
-项目统一使用 LF。
+- 源码
+- 配置文件
+- `package.json`
+- `pnpm-lock.yaml`
+- `pnpm-workspace.yaml`
+- 必要文档
 
-建议项目根目录保留 `.gitattributes`：
+## 8. 常用检查
 
-```text
-* text=auto eol=lf
-```
-
-建议 VS Code 使用：
-
-```json
-{
-  "files.eol": "\n"
-}
-```
-
-Windows Git 建议：
-
-```powershell
-git config --global core.autocrlf input
-```
-
-## 8. 常用命令
-
-查看状态：
+提交前建议：
 
 ```powershell
 git status
-```
-
-查看修改：
-
-```powershell
 git diff
+pnpm.cmd lint
+.\node_modules\.bin\tsc.CMD --noEmit
 ```
 
-暂存全部修改：
+查看分支和历史：
 
 ```powershell
-git add .
+git branch -vv
+git log --oneline --graph --decorate --all -n 20
 ```
-
-提交：
-
-```powershell
-git commit -m "feat: add something"
-```
-
-推送：
-
-```powershell
-git push
-```
-
-查看提交历史：
-
-```powershell
-git log --oneline --graph --decorate
-```
-
-## 9. 当前阶段建议
-
-当前 DevDesk 处于学习项目早期，推荐节奏：
-
-1. `chore: scaffold electron react app`
-2. `feat: add devdesk mvp workspace`
-3. `feat: persist workspace data`
-4. `feat: add sqlite storage`
-5. `feat: package windows app`
