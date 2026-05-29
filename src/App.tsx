@@ -243,6 +243,7 @@ function LogsPage({
   projectNameById: Map<string, string>
 }) {
   const { data } = workspace
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
     date: getToday(),
     projectId: '',
@@ -252,10 +253,15 @@ function LogsPage({
     nextPlan: '',
   })
 
+  function resetForm(): void {
+    setEditingId(null)
+    setForm({ date: getToday(), projectId: '', learned: '', problems: '', solutions: '', nextPlan: '' })
+  }
+
   function submit(event: FormEvent): void {
     event.preventDefault()
-    workspace.addLog(form)
-    setForm({ date: getToday(), projectId: '', learned: '', problems: '', solutions: '', nextPlan: '' })
+    workspace.saveLog(form, editingId)
+    resetForm()
   }
 
   return (
@@ -267,7 +273,7 @@ function LogsPage({
         <TextField label="遇到的问题" value={form.problems} onChange={(problems) => setForm({ ...form, problems })} />
         <TextField label="解决方案" value={form.solutions} onChange={(solutions) => setForm({ ...form, solutions })} />
         <TextField label="明天继续" value={form.nextPlan} onChange={(nextPlan) => setForm({ ...form, nextPlan })} />
-        <FormActions submitLabel="新建日志" />
+        <FormActions submitLabel={editingId ? '保存日志' : '新建日志'} onCancel={resetForm} />
       </form>
 
       <div className="card-list">
@@ -280,6 +286,22 @@ function LogsPage({
               <small>{log.nextPlan || '未填写明天计划'}</small>
             </div>
             <div className="row-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingId(log.id)
+                  setForm({
+                    date: log.date,
+                    projectId: log.projectId,
+                    learned: log.learned,
+                    problems: log.problems,
+                    solutions: log.solutions,
+                    nextPlan: log.nextPlan,
+                  })
+                }}
+              >
+                编辑
+              </button>
               <button
                 className="danger"
                 type="button"
