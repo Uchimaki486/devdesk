@@ -86,15 +86,17 @@ export function useWorkspaceData() {
         ),
       }));
     },
-    addLog(logForm: LogForm) {
+    saveLog(logForm: LogForm, editingId?: string | null) {
       const log: LearningLog = {
-        id: createId("log"),
+        id: editingId ?? createId("log"),
         ...logForm,
       };
 
       setData((currentData) => ({
         ...currentData,
-        logs: [log, ...currentData.logs],
+        logs: editingId
+          ? currentData.logs.map((item) => (item.id === editingId ? log : item))
+          : [log, ...currentData.logs],
       }));
     },
     deleteLog(logId: string) {
