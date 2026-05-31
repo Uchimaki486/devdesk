@@ -67,10 +67,16 @@ function App() {
       </aside>
 
       <section className="workspace">
-        {page === 'dashboard' && <Dashboard data={data} projectNameById={projectNameById} />}
+        {page === 'dashboard' && (
+          <Dashboard data={data} projectNameById={projectNameById} />
+        )}
         {page === 'projects' && <ProjectsPage workspace={workspace} />}
-        {page === 'logs' && <LogsPage workspace={workspace} projectNameById={projectNameById} />}
-        {page === 'tasks' && <TasksPage workspace={workspace} projectNameById={projectNameById} />}
+        {page === 'logs' && (
+          <LogsPage workspace={workspace} projectNameById={projectNameById} />
+        )}
+        {page === 'tasks' && (
+          <TasksPage workspace={workspace} projectNameById={projectNameById} />
+        )}
         {page === 'apps' && <AppsPage workspace={workspace} />}
         {page === 'settings' && <SettingsPage />}
       </section>
@@ -118,7 +124,11 @@ function Dashboard({
         </Panel>
         <Panel title="最近日志">
           {data.logs.slice(0, 4).map((log) => (
-            <InfoRow key={log.id} title={log.date} meta={log.learned || '暂无内容'} />
+            <InfoRow
+              key={log.id}
+              title={log.date}
+              meta={log.learned || '暂无内容'}
+            />
           ))}
         </Panel>
       </div>
@@ -126,11 +136,7 @@ function Dashboard({
   )
 }
 
-function ProjectsPage({
-  workspace,
-}: {
-  workspace: WorkspaceActions
-}) {
+function ProjectsPage({ workspace }: { workspace: WorkspaceActions }) {
   const { data } = workspace
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -167,23 +173,48 @@ function ProjectsPage({
   return (
     <Page title="项目" subtitle="管理正在做、准备做、已经完成的学习项目">
       <form className="editor" onSubmit={submit}>
-        <Field label="项目名称" value={form.name} onChange={(name) => setForm({ ...form, name })} />
+        <Field
+          label="项目名称"
+          value={form.name}
+          onChange={(name) => setForm({ ...form, name })}
+        />
         <SelectField
           label="状态"
           value={form.status}
           options={projectStatuses}
-          onChange={(status) => setForm({ ...form, status: status as ProjectStatus })}
+          onChange={(status) =>
+            setForm({ ...form, status: status as ProjectStatus })
+          }
         />
-        <Field label="技术栈" value={form.techStack} onChange={(techStack) => setForm({ ...form, techStack })} />
-        <Field label="本地路径" value={form.localPath} onChange={(localPath) => setForm({ ...form, localPath })} />
-        <Field label="仓库地址" value={form.repoUrl} onChange={(repoUrl) => setForm({ ...form, repoUrl })} />
+        <Field
+          label="技术栈"
+          value={form.techStack}
+          onChange={(techStack) => setForm({ ...form, techStack })}
+        />
+        <Field
+          label="本地路径"
+          value={form.localPath}
+          onChange={(localPath) => setForm({ ...form, localPath })}
+        />
+        <Field
+          label="仓库地址"
+          value={form.repoUrl}
+          onChange={(repoUrl) => setForm({ ...form, repoUrl })}
+        />
         <TextField
           label="当前目标"
           value={form.currentGoal}
           onChange={(currentGoal) => setForm({ ...form, currentGoal })}
         />
-        <TextField label="下一步" value={form.nextStep} onChange={(nextStep) => setForm({ ...form, nextStep })} />
-        <FormActions submitLabel={editingId ? '保存项目' : '新建项目'} onCancel={resetForm} />
+        <TextField
+          label="下一步"
+          value={form.nextStep}
+          onChange={(nextStep) => setForm({ ...form, nextStep })}
+        />
+        <FormActions
+          submitLabel={editingId ? '保存项目' : '新建项目'}
+          onCancel={resetForm}
+        />
       </form>
 
       <div className="card-list">
@@ -197,7 +228,12 @@ function ProjectsPage({
             </div>
             <div className="row-actions">
               {project.localPath && (
-                <button type="button" onClick={() => window.devdesk.system.openTarget(project.localPath)}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.devdesk.system.openTarget(project.localPath)
+                  }
+                >
                   打开
                 </button>
               )}
@@ -221,9 +257,7 @@ function ProjectsPage({
               <button
                 className="danger"
                 type="button"
-                onClick={() =>
-                  workspace.deleteProject(project.id)
-                }
+                onClick={() => workspace.deleteProject(project.id)}
               >
                 删除
               </button>
@@ -255,7 +289,14 @@ function LogsPage({
 
   function resetForm(): void {
     setEditingId(null)
-    setForm({ date: getToday(), projectId: '', learned: '', problems: '', solutions: '', nextPlan: '' })
+    setForm({
+      date: getToday(),
+      projectId: '',
+      learned: '',
+      problems: '',
+      solutions: '',
+      nextPlan: '',
+    })
   }
 
   function submit(event: FormEvent): void {
@@ -267,13 +308,41 @@ function LogsPage({
   return (
     <Page title="学习日志" subtitle="把每天学到的东西和问题沉淀下来">
       <form className="editor" onSubmit={submit}>
-        <Field label="日期" type="date" value={form.date} onChange={(date) => setForm({ ...form, date })} />
-        <ProjectSelect projects={data.projects} value={form.projectId} onChange={(projectId) => setForm({ ...form, projectId })} />
-        <TextField label="今天学了什么" value={form.learned} onChange={(learned) => setForm({ ...form, learned })} />
-        <TextField label="遇到的问题" value={form.problems} onChange={(problems) => setForm({ ...form, problems })} />
-        <TextField label="解决方案" value={form.solutions} onChange={(solutions) => setForm({ ...form, solutions })} />
-        <TextField label="明天继续" value={form.nextPlan} onChange={(nextPlan) => setForm({ ...form, nextPlan })} />
-        <FormActions submitLabel={editingId ? '保存日志' : '新建日志'} onCancel={resetForm} />
+        <Field
+          label="日期"
+          type="date"
+          value={form.date}
+          onChange={(date) => setForm({ ...form, date })}
+        />
+        <ProjectSelect
+          projects={data.projects}
+          value={form.projectId}
+          onChange={(projectId) => setForm({ ...form, projectId })}
+        />
+        <TextField
+          label="今天学了什么"
+          value={form.learned}
+          onChange={(learned) => setForm({ ...form, learned })}
+        />
+        <TextField
+          label="遇到的问题"
+          value={form.problems}
+          onChange={(problems) => setForm({ ...form, problems })}
+        />
+        <TextField
+          label="解决方案"
+          value={form.solutions}
+          onChange={(solutions) => setForm({ ...form, solutions })}
+        />
+        <TextField
+          label="明天继续"
+          value={form.nextPlan}
+          onChange={(nextPlan) => setForm({ ...form, nextPlan })}
+        />
+        <FormActions
+          submitLabel={editingId ? '保存日志' : '新建日志'}
+          onCancel={resetForm}
+        />
       </form>
 
       <div className="card-list">
@@ -305,9 +374,7 @@ function LogsPage({
               <button
                 className="danger"
                 type="button"
-                onClick={() =>
-                  workspace.deleteLog(log.id)
-                }
+                onClick={() => workspace.deleteLog(log.id)}
               >
                 删除
               </button>
@@ -339,7 +406,14 @@ function TasksPage({
 
   function resetForm(): void {
     setEditingId(null)
-    setForm({ projectId: '', title: '', status: '待做', priority: '中', dueDate: '', notes: '' })
+    setForm({
+      projectId: '',
+      title: '',
+      status: '待做',
+      priority: '中',
+      dueDate: '',
+      notes: '',
+    })
   }
 
   function submit(event: FormEvent): void {
@@ -352,23 +426,47 @@ function TasksPage({
   return (
     <Page title="任务" subtitle="拆解下一步要做的具体动作">
       <form className="editor" onSubmit={submit}>
-        <Field label="任务标题" value={form.title} onChange={(title) => setForm({ ...form, title })} />
-        <ProjectSelect projects={data.projects} value={form.projectId} onChange={(projectId) => setForm({ ...form, projectId })} />
+        <Field
+          label="任务标题"
+          value={form.title}
+          onChange={(title) => setForm({ ...form, title })}
+        />
+        <ProjectSelect
+          projects={data.projects}
+          value={form.projectId}
+          onChange={(projectId) => setForm({ ...form, projectId })}
+        />
         <SelectField
           label="状态"
           value={form.status}
           options={taskStatuses}
-          onChange={(status) => setForm({ ...form, status: status as TaskStatus })}
+          onChange={(status) =>
+            setForm({ ...form, status: status as TaskStatus })
+          }
         />
         <SelectField
           label="优先级"
           value={form.priority}
           options={priorities}
-          onChange={(priority) => setForm({ ...form, priority: priority as Priority })}
+          onChange={(priority) =>
+            setForm({ ...form, priority: priority as Priority })
+          }
         />
-        <Field label="截止日期" type="date" value={form.dueDate} onChange={(dueDate) => setForm({ ...form, dueDate })} />
-        <TextField label="备注" value={form.notes} onChange={(notes) => setForm({ ...form, notes })} />
-        <FormActions submitLabel={editingId ? '保存任务' : '新建任务'} onCancel={resetForm} />
+        <Field
+          label="截止日期"
+          type="date"
+          value={form.dueDate}
+          onChange={(dueDate) => setForm({ ...form, dueDate })}
+        />
+        <TextField
+          label="备注"
+          value={form.notes}
+          onChange={(notes) => setForm({ ...form, notes })}
+        />
+        <FormActions
+          submitLabel={editingId ? '保存任务' : '新建任务'}
+          onCancel={resetForm}
+        />
       </form>
 
       <div className="task-columns">
@@ -428,12 +526,9 @@ function TasksPage({
   )
 }
 
-function AppsPage({
-  workspace,
-}: {
-  workspace: WorkspaceActions
-}) {
+function AppsPage({ workspace }: { workspace: WorkspaceActions }) {
   const { data } = workspace
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
     name: '',
     type: '网页链接' as AppEntryType,
@@ -441,26 +536,46 @@ function AppsPage({
     target: '',
   })
 
+  function resetForm(): void {
+    setEditingId(null)
+    setForm({ name: '', type: '网页链接', description: '', target: '' })
+  }
+
   function submit(event: FormEvent): void {
     event.preventDefault()
     if (!form.name.trim()) return
-    workspace.addApp(form)
-    setForm({ name: '', type: '网页链接', description: '', target: '' })
+    workspace.saveApp(form, editingId)
+    resetForm()
   }
 
   return (
     <Page title="应用入口" subtitle="登记后续制作的小工具、网页和本地项目">
       <form className="editor" onSubmit={submit}>
-        <Field label="应用名称" value={form.name} onChange={(name) => setForm({ ...form, name })} />
+        <Field
+          label="应用名称"
+          value={form.name}
+          onChange={(name) => setForm({ ...form, name })}
+        />
         <SelectField
           label="类型"
           value={form.type}
           options={appTypes}
           onChange={(type) => setForm({ ...form, type: type as AppEntryType })}
         />
-        <Field label="地址或路径" value={form.target} onChange={(target) => setForm({ ...form, target })} />
-        <TextField label="描述" value={form.description} onChange={(description) => setForm({ ...form, description })} />
-        <FormActions submitLabel="新建入口" />
+        <Field
+          label="地址或路径"
+          value={form.target}
+          onChange={(target) => setForm({ ...form, target })}
+        />
+        <TextField
+          label="描述"
+          value={form.description}
+          onChange={(description) => setForm({ ...form, description })}
+        />
+        <FormActions
+          submitLabel={editingId ? '保存入口' : '新建入口'}
+          onCancel={resetForm}
+        />
       </form>
 
       <div className="card-list">
@@ -474,16 +589,31 @@ function AppsPage({
             </div>
             <div className="row-actions">
               {entry.target && (
-                <button type="button" onClick={() => window.devdesk.system.openTarget(entry.target)}>
+                <button
+                  type="button"
+                  onClick={() => window.devdesk.system.openTarget(entry.target)}
+                >
                   打开
                 </button>
               )}
               <button
+                type="button"
+                onClick={() => {
+                  setEditingId(entry.id)
+                  setForm({
+                    name: entry.name,
+                    type: entry.type,
+                    description: entry.description,
+                    target: entry.target,
+                  })
+                }}
+              >
+                编辑
+              </button>
+              <button
                 className="danger"
                 type="button"
-                onClick={() =>
-                  workspace.deleteApp(entry.id)
-                }
+                onClick={() => workspace.deleteApp(entry.id)}
               >
                 删除
               </button>
@@ -499,7 +629,9 @@ function SettingsPage() {
   return (
     <Page title="设置" subtitle="第一版先保留简单设置入口">
       <div className="panel-grid">
-        <Panel title="数据存储">当前数据暂存在浏览器本地存储，后续可迁移到 SQLite。</Panel>
+        <Panel title="数据存储">
+          当前数据暂存在浏览器本地存储，后续可迁移到 SQLite。
+        </Panel>
         <Panel title="主题">当前使用浅色工作台风格，深色模式后续再加。</Panel>
         <Panel title="备份">导入、导出和备份功能留到数据模型稳定后实现。</Panel>
       </div>
@@ -507,7 +639,15 @@ function SettingsPage() {
   )
 }
 
-function Page({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
+function Page({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string
+  subtitle: string
+  children: ReactNode
+}) {
   return (
     <div className="page">
       <header className="page-header">
@@ -560,16 +700,31 @@ function Field({
   return (
     <label className="field">
       <span>{label}</span>
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </label>
   )
 }
 
-function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function TextField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}) {
   return (
     <label className="field">
       <span>{label}</span>
-      <textarea value={value} onChange={(event) => onChange(event.target.value)} />
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </label>
   )
 }
@@ -623,7 +778,13 @@ function ProjectSelect({
   )
 }
 
-function FormActions({ submitLabel, onCancel }: { submitLabel: string; onCancel?: () => void }) {
+function FormActions({
+  submitLabel,
+  onCancel,
+}: {
+  submitLabel: string
+  onCancel?: () => void
+}) {
   return (
     <div className="form-actions">
       <button className="primary-button" type="submit">
